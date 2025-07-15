@@ -14,12 +14,12 @@ Most tasks can be done with the `admin.sh` script:
 
 After setup you can test boot with different images:
 ```
+./admin.sh image_build --type=gpt   # default
+./admin.sh qemu --uefi
 ./admin.sh image_build --type=fat   # requires sudo
 ./admin.sh qemu
 ./admin.sh image_build --type=mbr   # requires sudo
 ./admin.sh qemu
-./admin.sh image_build --type=gpt
-./admin.sh qemu --uefi
 ```
 
 Tools:
@@ -249,8 +249,22 @@ qemu ... \
 **NOTE**: In many places the `--bios` option is proposed. I haven't got
 that to work. "pflash" works fine though.
 
-If you *must* build OVMF, pray that `./admin.sh edk2_build` works, if not
-some good hints can be found [here](https://wiki.ubuntu.com/UEFI/EDK2).
+#### EDK2
+
+OVMF is a part of [EDK2](https://github.com/tianocore/edk2) which has
+a build system that is... un-intuitive (to put it nicely). Some good
+hints can be found [here](https://wiki.ubuntu.com/UEFI/EDK2). If you
+*must* build it, try:
+
+```
+export edk2d=/your/path/to/edk2
+git clone --depth 1 https://github.com/tianocore/edk2.git $edk2d
+cd $edk2d
+git submodule update --init --depth 1
+cd -
+./admin.sh edk2_build
+```
+
 
 ### The EFI partition
 
@@ -347,26 +361,3 @@ Build locally:
 ./admin.sh grub_build --arch=aarch64
 ```
 
-
-## References
-
-In no particular order:
-
-* https://community.nxp.com/t5/i-MX-Processors/Write-u-Boot-environment-variable-to-SD-card/m-p/1675461
-* https://interrupt.memfault.com/blog/emulating-raspberry-pi-in-qemu
-* https://bootlin.com/
-* https://krinkinmu.github.io/
-* https://github.com/byte4RR4Y/rock4se-image-builder/blob/main/rock-emulator.sh
-* https://wiki.ubuntu.com/UEFI/EDK2
-* https://www.rodsbooks.com/efi-bootloaders/index.html
-* https://wiki.osdev.org/UEFI#Emulation_with_QEMU_and_OVMF
-* https://github.com/tianocore/tianocore.github.io/wiki/How-to-run-OVMF
-* https://wiki.ubuntu.com/UEFI/EDK2
-* https://wiki.osdev.org/UEFI
-* https://gitlab.com/bztsrc/posix-uefi
-* https://unix.stackexchange.com/questions/52996/how-to-boot-efi-kernel-using-qemu-kvm
-* https://wiki.syslinux.org/wiki/index.php?title=SYSLINUX
-* https://shallowsky.com/linux/extlinux.html
-* https://wiki.archlinux.org/title/Syslinux
-* https://www.linkedin.com/pulse/unleashing-gatekeepers-u-boot-vs-grub-embedded-mudduluru-ry9ze/
-* https://ftp.gnu.org/gnu/grub/

@@ -47,23 +47,26 @@ cmd_env() {
 	eset \
 		BOOTLOADER_WORKSPACE=/tmp/tmp/$USER/bootloader \
 		KERNELDIR=$HOME/tmp/linux \
-		__musl='' \
-		__arch=x86_64 \
-		__board=sandbox
-	if test "$__arch" != "x86_64"; then
-		__musl=yes
-		__board=qemu_arm64
-	fi
+		kernel='' \
+		__arch=x86_64
 	eset WS=$BOOTLOADER_WORKSPACE/$__arch
+	eset __kobj=$WS/obj/$ver_kernel
+	if test "$__arch" = "aarch64"; then
+		kernel=$__kobj/arch/arm64/boot/Image
+		eset \
+			__board=qemu_arm64
+	else
+		kernel=$__kobj/arch/$__arch/boot/bzImage
+		eset \
+			__board=sandbox
+	fi
 	eset \
 		__kdir=$KERNELDIR/$ver_kernel \
 		__kcfg=$dir/config/$ver_kernel-$__arch \
-		__kobj=$WS/obj/$ver_kernel \
 		__bbcfg=$dir/config/$ver_busybox \
 		__uboot_cfg=$dir/config/uboot-$__board-$__arch \
 		__ubootobj=$WS/uboot-obj \
-		musldir=$GOPATH/src/github.com/richfelker/musl-cross-make \
-		__type=mbr \
+		__type=gpt \
 		__size=64MiB \
 		edk2d=$GOPATH/src/github.com/tianocore/edk2 \
 		__bootscr=$dir/config/u-boot.scr
@@ -81,22 +84,12 @@ cmd_env() {
 			OVMF_CODE=/usr/share/OVMF/OVMF_CODE_4M.fd \
 			OVMF_VARS=/usr/share/OVMF/OVMF_VARS_4M.fd
 	fi
-	kernel=$__kobj/arch/$__arch/boot/bzImage
-	test "$__arch" = "aarch64" && kernel=$__kobj/arch/arm64/boot/Image
 	if test "$cmd" = "env"; then
 		set | grep -E "^($opts)="
 		exit 0
 	fi
 	test -n "$long_opts" && export $long_opts
 	mkdir -p $WS
-	if test "$__musl" = "yes"; then
-		test -x $musldir/$__arch/bin/$__arch-linux-musl-gcc || \
-			die "No musl cross-compiler built for [$__arch]"
-		export PATH=$musldir/$__arch/bin:$PATH
-		musl_cc="CC=$__arch-linux-musl-cc AR=$__arch-linux-musl-ar"
-		musl_at="--host=$__arch-linux-musl"
-		musl_meson="--cross-file $dir/config/meson-cross.$__arch"
-	fi
 	disk=$dir/disk.sh
 	export __image
 }
@@ -202,7 +195,7 @@ cmd_kernel_build() {
 	fi
 	$make -j$(nproc)
 }
-##   busybox_build [--bbcfg=] [--menuconfig] [--musl]
+##   busybox_build [--bbcfg=] [--menuconfig]
 ##     Build BusyBox
 cmd_busybox_build() {
 	cdsrc $ver_busybox
@@ -214,9 +207,8 @@ cmd_busybox_build() {
 		test -r $__bbcfg || die "No config"
 		cp $__bbcfg .config
 	fi
-	if test "$__musl" = "yes"; then
-		sed -i -E "s,CONFIG_CROSS_COMPILER_PREFIX=\"\",CONFIG_CROSS_COMPILER_PREFIX=\"$__arch-linux-musl-\"," .config
-	fi
+	
+	sed -i -E "s,CONFIG_CROSS_COMPILER_PREFIX=\"\",CONFIG_CROSS_COMPILER_PREFIX=\"$__arch-linux-gnu-\"," .config
 	make -j$(nproc)
 }
 ##   initrd_build [--initrd=] [ovls...]
@@ -491,7 +483,7 @@ cmd_grub_build() {
 	cdsrc $ver_grub
 	#https://www.linuxfromscratch.org/lfs/view/development/chapter08/grub.html
 	echo depends bli part_gpt > grub-core/extra_deps.lst
-	./configure $musl_at || die "configure"
+	./configure --host=$__arch-linux-gnu || die "configure"
 	make -j$(nproc) || die make
 	make DESTDIR=$PWD/sys install || die "make install"
 }
