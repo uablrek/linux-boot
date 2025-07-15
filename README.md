@@ -3,6 +3,9 @@
 Boot examples with Linux. A small Linux kernel with initrd is loaded
 in a Qemu VM with different disk partitions and bootloaders.
 
+[Development and contributions](#development-and-contributions) are
+described below below.
+
 
 Most tasks can be done with the `admin.sh` script:
 ```
@@ -361,3 +364,36 @@ Build locally:
 ./admin.sh grub_build --arch=aarch64
 ```
 
+
+## Development and contributions
+
+Issues and PR's are welcome. Please note that the license is CC0-1.0,
+meaning that everything you contribute will become public domain.
+
+I use Ubuntu Linux, `24.04.2 LTS` at the moment. Other Linux distros
+should work, but are not tested.
+
+Here are some dependencies:
+```
+sudo apt install -y efitools ovmf fdisk gcc-aarch64-linux-gnu qemu-system-arm
+```
+I am sure there are plenty more. PR's are welcome for updates here.
+
+By default everything is stored under `/tmp/tmp/$USER` because I mount
+a tmpfs (ramdisk) on `/tmp/tmp` for experiments. You may change that
+by setting the `$TEMP` environment variable.
+
+Source archives must be downloaded (by you).
+```
+./admin.sh versions
+linux-6.15.4         (/home/uablrek/archive/linux-6.15.4.tar.xz)
+busybox-1.36.1       (/home/uablrek/archive/busybox-1.36.1.tar.bz2)
+syslinux-6.03        (/home/uablrek/Downloads/syslinux-6.03.tar.xz)
+u-boot-2025.07       (/home/uablrek/Downloads/u-boot-2025.07.tar.gz)
+grub-2.12            (/home/uablrek/Downloads/grub-2.12.tar.xz)
+```
+They are searched for in `$HOME/Downloads:$HOME/archive` by default.
+
+The kernel source will be unpacked in `$KERNELDIR` if necessary, which
+defaults to `$HOME/tmp/linux`. The kernel is not built in this
+directory, so you may write-protect it if you like.

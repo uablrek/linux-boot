@@ -8,8 +8,9 @@
 
 prg=$(basename $0)
 dir=$(dirname $0); dir=$(readlink -f $dir)
+test -n "$TEMP" || TEMP=/tmp/tmp/$USER
 me=$dir/$prg
-tmp=/tmp/tmp/$USER/${prg}_$$
+tmp=$TEMP/${prg}_$$
 
 die() {
     echo "ERROR: $*" >&2
@@ -28,10 +29,13 @@ log() {
 	echo "$*" >&2
 }
 findf() {
-	f=$HOME/Downloads/$1
-	test -r $f && return 0
-	test -n "$ARCHIVE" && f=$ARCHIVE/$1
-	test -r $f
+	local d
+	for d in $(echo $FSEARCH_PATH | tr : ' '); do
+		f=$d/$1
+		test -r $f && return 0
+	done
+	unset f
+	return 1
 }
 findar() {
 	findf $1.tar.bz2 || findf $1.tar.gz || findf $1.tar.xz || findf $1.zip || findf $1.tgz || findf $1-x86_64.tar.gz
@@ -42,10 +46,12 @@ findar() {
 cmd_env() {
 	test "$envread" = "yes" && return 0
 	envread=yes
+	eset ARCHIVE=$HOME/archive
+	eset FSEARCH_PATH=$HOME/Downloads:$ARCHIVE
 	versions
 	unset opts
 	eset \
-		BOOTLOADER_WORKSPACE=/tmp/tmp/$USER/bootloader \
+		BOOTLOADER_WORKSPACE=$TEMP/bootloader \
 		KERNELDIR=$HOME/tmp/linux \
 		kernel='' \
 		__arch=x86_64
@@ -101,24 +107,25 @@ versions() {
 		ver_busybox=busybox-1.36.1 \
 		ver_syslinux=syslinux-6.03 \
 		ver_uboot=u-boot-2025.07 \
-		ver_grub=grub-2.12 \
-		ver_efilinux=efilinux-1.1 \
-		ver_elilo=elilo-3.6
+		ver_grub=grub-2.12
 }
 cmd_versions() {
 	unset opts
 	versions
-	set | grep -E "^($opts)="
-	test "$__brief" = "yes" && return 0
+	if test "$__brief" = "yes"; then
+	   set | grep -E "^($opts)="
+	   return 0
+	fi
 	local k v
 	for k in $(echo $opts | tr '|' ' '); do
 		v=$(eval echo \$$k)
-		findar $v || echo "Missing archive [$v]"
+		if findar $v; then
+			printf "%-20s (%s)\n" $v $f
+		else
+			printf "%-20s (archive missing!)\n" $v
+		fi
 	done
-	for k in $__kdir; do
-		test -d $k || echo "Missing directory [$k]"
-	done
-	#https://mirrors.edge.kernel.org/pub/linux/utils/boot/syslinux/
+	test -d $__kdir || echo "Kernel not unpacked at [$__kdir]"
 }
 # Set variables unless already defined
 eset() {
@@ -169,10 +176,20 @@ cmd_setup_aarch64() {
 	$me uboot_build || die uboot_build
 	$me uboot-image || die uboot-image
 }
+#   kernel_unpack
+#     Unpack the kernel at $KERNELDIR
+cmd_kernel_unpack() {
+	test -d $__kdir && return 0	  # (already unpacked)
+	log "Unpack kernel to [$__kdir]..."
+	findar $ver_kernel || die "Kernel source not found [$ver_kernel]"
+	mkdir -p $KERNELDIR
+	tar -C $KERNELDIR -xf $f
+}
 ##   kernel_build --tinyconfig  # Init the kcfg
 ##   kernel_build [--menuconfig]
 ##     Build the kernel
 cmd_kernel_build() {
+	cmd_kernel_unpack
 	mkdir -p $__kobj
 	local make="make -C $__kdir O=$__kobj"
 	test "$__arch" = "aarch64" && \
@@ -258,6 +275,7 @@ EOF
 cmd_gen_init_cpio() {
 	local x=$WS/bin/gen_init_cpio
 	test -x $x && return 0
+	cmd_kernel_unpack	
 	mkdir -p $(dirname $x)
 	local src=$__kdir/usr/gen_init_cpio.c
 	test -r $src || die "Not readable [$src]"
@@ -416,19 +434,6 @@ cmd_syslinux_build() {
 	cdsrc $ver_syslinux
 	patch -p1 -b < $dir/config/$ver_syslinux.patch
 	make -j$(nproc)
-}
-#   efilinux_build
-cmd_efilinux_build() {
-	__clean=yes
-	cdsrc $ver_efilinux
-	patch -p1 -b < $dir/config/$ver_efilinux.patch
-	make -j$(nproc)
-}
-#   elilo_build
-cmd_elilo_build() {
-	__clean=yes
-	cdsrc $ver_elilo
-	pwd
 }
 ##   uboot_build [--board=] [--default] [--menuconfig]
 ##     Build U-boot. "initconfig" tries to get the defconfig for the board
