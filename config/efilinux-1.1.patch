@@ -1,0 +1,25 @@
+--- efilinux-1.1/Makefile.orig	2014-02-25 13:42:42.000000000 +0100
++++ efilinux-1.1/Makefile	2025-07-03 10:55:03.017033684 +0200
+@@ -49,11 +49,11 @@
+ 
+ # gnuefi sometimes installs these under a gnuefi/ directory, and sometimes not
+ CRT0 := $(shell find $(LIBDIR) -name crt0-efi-$(ARCH).o 2>/dev/null | tail -n1)
+-LDSCRIPT := $(shell find $(LIBDIR) -name elf_$(ARCH)_efi.lds 2>/dev/null | tail -n1)
++LDSCRIPT := /usr/lib/elf_x86_64_efi.lds
+ 
+ CFLAGS=-I. -I$(INCDIR)/efi -I$(INCDIR)/efi/$(ARCH) \
+ 		-DEFI_FUNCTION_WRAPPER -fPIC -fshort-wchar -ffreestanding \
+-		-Wall -Ifs/ -Iloaders/ -D$(ARCH) -Werror
++		-Wall -Ifs/ -Iloaders/ -D$(ARCH)
+ 
+ ifeq ($(ARCH),ia32)
+ 	ifeq ($(HOST),x86_64)
+@@ -65,7 +65,7 @@
+ endif
+ 
+ LDFLAGS=-T $(LDSCRIPT) -Bsymbolic -shared -nostdlib -znocombreloc \
+-		-L$(LIBDIR) $(CRT0)
++		-L$(LIBDIR) -L/usr/lib $(CRT0)
+ 
+ IMAGE=efilinux.efi
+ OBJS = entry.o malloc.o

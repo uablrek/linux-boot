@@ -1,0 +1,30 @@
+#! /bin/sh
+# NOTE: A common pattern is to specify "-" (stdout) as out-file,
+#  so there must be NO log printouts to stdout!
+
+dir=$(dirname $0); dir=$(readlink -f $dir)
+cd $dir
+tmp=/tmp/tmp/$USER/initrd_$$
+die() {
+	echo "ERROR: $*" >&2
+	rm -rf $tmp
+	exit 1
+}
+log() {
+	echo "INFO: $*" >&2
+}
+findf() {
+    f=$ARCHIVE/$1
+    test -r $f || f=$HOME/Downloads/$1
+    test -r $f
+}
+test -n "$1" || die "No out-file"
+sh=$(readlink -f ../admin.sh)
+test -x $sh || die "Not executable [$sh]"
+mkdir -p $tmp
+cp -R root/* $tmp
+
+cd $tmp
+tar cf "$1" *
+cd $dir
+rm -rf $tmp

@@ -1,0 +1,179 @@
+--- syslinux-6.03/com32/hdt/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/com32/hdt/Makefile	2024-08-23 07:41:15.672007454 +0200
+@@ -52,7 +52,7 @@
+ all: $(MODULES) $(TESTFILES)
+ 
+ hdt.elf : $(OBJS) $(LIBS) $(C_LIBS)
+-	$(LD) $(LDFLAGS) -o $@ $^
++	$(LD) $(LDFLAGS) -z muldefs -o $@ $^
+ 
+ memtest:
+ 	-[ ! -f $(FLOPPY_DIR)/$(MEMTEST) ] && $(WGET) $(MEMTEST_URL) -O $(FLOPPY_DIR)/$(MEMTEST)
+--- syslinux-6.03/com32/cmenu/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/com32/cmenu/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -49,7 +49,7 @@
+ 	@mkdir -p $(OBJ)/libmenu
+ 
+ libmenu/libmenu.elf: $(LIBMENU)
+-	$(LD) -shared $(LDFLAGS) -soname $(patsubst %.elf,%.c32,$(@F)) \
++	$(LD) -shared $(LDFLAGS) -z muldefs -soname $(patsubst %.elf,%.c32,$(@F)) \
+ 		-o $@ $^
+ 
+ tidy dist:
+--- syslinux-6.03/com32/elflink/ldlinux/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/com32/elflink/ldlinux/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -33,7 +33,7 @@
+ all: $(BTARGET) ldlinux_lnx.a
+ 
+ ldlinux.elf : $(OBJS)
+-	$(LD) $(LDFLAGS) -soname $(SONAME) -o $@ $^ $(LIBS)
++	$(LD) $(LDFLAGS) -z muldefs -soname $(SONAME) -o $@ $^ $(LIBS)
+ 
+ LNXCFLAGS += -D__export='__attribute__((visibility("default")))'
+ LNXLIBOBJS = get_key.lo
+--- syslinux-6.03/com32/gpllib/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/com32/gpllib/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -24,7 +24,7 @@
+ 		$(addprefix $(OBJ),$(sort $(dir $(LIBOBJS)))),$(b))
+ 
+ libgpl.elf : $(LIBOBJS)
+-	$(LD) -shared $(LDFLAGS) -soname $(patsubst %.elf,%.c32,$(@F)) -o $@ $^
++	$(LD) -shared $(LDFLAGS) -z muldefs -soname $(patsubst %.elf,%.c32,$(@F)) -o $@ $^
+ 
+ tidy dist clean:
+ 	find . \( -name \*.o -o -name .\*.d -o -name \*.tmp \) -print0 | \
+--- syslinux-6.03/gpxe/src/arch/i386/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/gpxe/src/arch/i386/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -55,7 +55,7 @@
+ ifeq ($(HOST_OS),FreeBSD)
+ LDFLAGS		+= -m elf_i386_fbsd
+ else
+-LDFLAGS		+= -m elf_i386
++LDFLAGS		+= -z muldefs -m elf_i386
+ endif
+ 
+ # EFI requires -fshort-wchar, and nothing else currently uses wchar_t
+--- syslinux-6.03/gpxe/src/Makefile.orig	2024-08-23 07:44:23.424488495 +0200
++++ syslinux-6.03/gpxe/src/Makefile	2024-08-23 07:45:01.706793037 +0200
+@@ -136,7 +136,7 @@
+ CFLAGS		+= -DVERSION_MAJOR=$(VERSION_MAJOR) \
+ 		   -DVERSION_MINOR=$(VERSION_MINOR) \
+ 		   -DVERSION_PATCH=$(VERSION_PATCH) \
+-		   -DVERSION=\"$(VERSION)\"
++		   -DVERSION=\"$(VERSION)\" -fno-PIE
+ IDENT		= '$(@F) $(VERSION) (GPL) etherboot.org'
+ version :
+ 	@$(ECHO) $(VERSION)
+--- syslinux-6.03/core/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/core/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -164,7 +164,7 @@
+ LDSCRIPT = $(SRC)/$(ARCH)/syslinux.ld
+ 
+ %.elf: %.o $(LIBDEP) $(LDSCRIPT) $(AUXLIBS)
+-	$(LD) $(LDFLAGS) -Bsymbolic $(LD_PIE) -E --hash-style=gnu -T $(LDSCRIPT) -M -o $@ $< \
++	$(LD) $(LDFLAGS) -z muldefs --noinhibit-exec -Bsymbolic $(LD_PIE) -E --hash-style=gnu -T $(LDSCRIPT) -M -o $@ $< \
+ 		--start-group $(LIBS) $(subst $(*F).elf,lib$(*F).a,$@) --end-group \
+ 		> $(@:.elf=.map)
+ 	$(OBJDUMP) -h $@ > $(@:.elf=.sec)
+--- syslinux-6.03/efi/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/efi/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -70,7 +70,7 @@
+ BTARGET  = syslinux.efi
+ 
+ syslinux.so: $(OBJS) $(CORE_OBJS) $(LIB_OBJS)
+-	$(LD) $(LDFLAGS) --strip-debug -o $@ $^ -lgnuefi -lefi
++	$(LD) $(LDFLAGS) -z muldefs --strip-debug -o $@ $^ -lgnuefi -lefi
+ 
+ # We need to rename the .hash section because the EFI firmware
+ # linker really doesn't like it.
+--- syslinux-6.03/mk/com32.mk.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/mk/com32.mk	2024-08-23 07:41:15.673007462 +0200
+@@ -47,6 +47,7 @@
+ GCCOPT += $(call gcc_ok,-falign-jumps=0,-malign-jumps=0)
+ GCCOPT += $(call gcc_ok,-falign-labels=0,-malign-labels=0)
+ GCCOPT += $(call gcc_ok,-falign-loops=0,-malign-loops=0)
++GCCOPT += $(call gcc_ok,-fcommon)
+ 
+ ifndef EFI_BUILD
+ GCCOPT += -mregparm=3 -DREGPARM=3
+--- syslinux-6.03/mk/elf.mk.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/mk/elf.mk	2024-08-23 07:41:15.673007462 +0200
+@@ -42,6 +42,7 @@
+ GCCOPT += $(call gcc_ok,-falign-jumps=0,-malign-jumps=0)
+ GCCOPT += $(call gcc_ok,-falign-labels=0,-malign-labels=0)
+ GCCOPT += $(call gcc_ok,-falign-loops=0,-malign-loops=0)
++GCCOPT += $(call gcc_ok,-fcommon)
+ 
+ com32 = $(topdir)/com32
+ core = $(topdir)/core
+--- syslinux-6.03/mk/embedded.mk.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/mk/embedded.mk	2024-08-23 07:41:15.673007462 +0200
+@@ -52,6 +52,7 @@
+ GCCOPT    += $(call gcc_ok,-falign-labels=0,-malign-labels=0)
+ GCCOPT    += $(call gcc_ok,-falign-loops=0,-malign-loops=0)
+ GCCOPT    += $(call gcc_ok,-fvisibility=hidden)
++GCCOPT    += $(call gcc_ok,-fcommon)
+ 
+ LIBGCC    := $(shell $(CC) $(GCCOPT) --print-libgcc)
+ 
+--- syslinux-6.03/mk/lib.mk.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/mk/lib.mk	2024-08-23 07:41:15.673007462 +0200
+@@ -28,6 +28,7 @@
+ GCCOPT += $(call gcc_ok,-falign-jumps=0,-malign-jumps=0)
+ GCCOPT += $(call gcc_ok,-falign-labels=0,-malign-labels=0)
+ GCCOPT += $(call gcc_ok,-falign-loops=0,-malign-loops=0)
++GCCOPT += $(call gcc_ok,-fcommon)
+ 
+ INCLUDE	= -I$(SRC)
+ STRIP	= strip --strip-all -R .comment -R .note
+--- syslinux-6.03/mk/efi.mk.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/mk/efi.mk	2024-08-23 07:41:15.673007462 +0200
+@@ -7,7 +7,7 @@
+ # Set up architecture specifics; for cross compilation, set ARCH as apt
+ # gnuefi sets up architecture specifics in ia32 or x86_64 sub directories
+ # set up the LIBDIR and EFIINC for building for the appropriate architecture
+-GCCOPT := $(call gcc_ok,-fno-stack-protector,)
++GCCOPT := $(call gcc_ok,-fno-stack-protector,) $(call gcc_ok,-fcommon)
+ EFIINC = $(objdir)/include/efi
+ LIBDIR  = $(objdir)/lib
+ 
+--- syslinux-6.03/dos/Makefile.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/dos/Makefile	2024-08-23 07:41:15.673007462 +0200
+@@ -19,7 +19,7 @@
+ CFLAGS	+= -D__MSDOS__ -mregparm=3 -DREGPARM=3
+ # CFLAGS  += -DDEBUG
+ 
+-LDFLAGS	 = -T $(SRC)/dosexe.ld
++LDFLAGS	 = -T $(SRC)/dosexe.ld -z muldefs
+ OPTFLAGS = -g
+ INCLUDES = -include code16.h -nostdinc -iwithprefix include \
+ 	   -I$(SRC) -I$(SRC)/.. -I$(SRC)/../libfat \
+--- syslinux-6.03/extlinux/main.c.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/extlinux/main.c	2024-08-23 07:41:15.673007462 +0200
+@@ -41,6 +41,7 @@
+ #include <sys/types.h>
+ #include <sys/mount.h>
+ #include <sys/vfs.h>
++#include <sys/sysmacros.h>
+ 
+ #include "linuxioctl.h"
+ 
+--- syslinux-6.03/libinstaller/getopt/getopt_long.c.orig	2014-10-06 18:27:44.000000000 +0200
++++ syslinux-6.03/libinstaller/getopt/getopt_long.c	2024-08-23 07:41:15.673007462 +0200
+@@ -12,7 +12,15 @@
+ #include <string.h>
+ #include <stddef.h>
+ #include <getopt.h>
+-
++#include <string.h>
++#if 1
++int strlen(char const* s)
++{
++	int c = 0;
++	while (*s++ == 0) c++;
++	return c;
++}
++#endif
+ char *optarg;
+ int optind, opterr, optopt;
+ static struct getopt_private_state {

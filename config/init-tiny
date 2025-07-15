@@ -1,0 +1,10 @@
+#! /bin/sh
+/bin/busybox echo "==== Init ramfs #1 ===="
+/bin/busybox mkdir -p /sbin /var/log /run /proc /sys /tmp /dev /usr/bin /usr/sbin
+/bin/busybox --install -s
+mount -t sysfs sysfs /sys
+mount -t proc procfs /proc
+mdev -s
+ls /dev
+date
+exec /bin/sh
