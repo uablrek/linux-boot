@@ -90,7 +90,7 @@ getpart() {
 	psize=$v
 }
 
-##   mkimage [--edit]
+##   mkimage [--image=] [--edit]
 ##     Create a "default" image. 128MiB, GPT partitioned with a EFI
 ##     and a Linux partition. For FAT/NTFS use:
 ##     EBD0A0A2-B9E5-4433-87C0-68B6B72699C7
@@ -104,28 +104,31 @@ label: gpt
 EOF
 	test "$__edit" = "yes" && vi $o
 	rm -f $__image
-	truncate -s 128MiB $__image
+	truncate -s 128MiB $__image || die "Image not writable [$__image]"
 	sfdisk --no-tell-kernel --no-reread $__image < $o || die "sfdisk"
 }
 
-##   mkfat [--p=#] -- [mkfs.fat-options...]
+##   mkfat [--image=] [--p=#] -- [mkfs.fat-options...]
 ##     Format a partition with a FAT file system
 cmd_mkfat() {
+	test -r "$__image" || die "Image not readable [$__image]"
 	getpart
 	mkfs.fat -S $sectorsize --offset $pstart $@ $__image $psize		
 }
-##   mkext [--p=#] -- [mke2fs-options...]
+##   mkext [--image=] [--p=#] -- [mke2fs-options...]
 ##     Format a partition with an EXT (Linux) file system. Example:
 ##     mkext --p=2 -- -t ext3
 cmd_mkext() {
+	test -r "$__image" || die "Image not readable [$__image]"
 	getpart
 	local offset=$((pstart * sectorsize))
 	local fssize=$((psize * sectorsize / 1024))
 	mke2fs -E offset=$offset $__image $fssize
 }
-##   loop-setup 
+##   loop-setup [--image=]
 ##     Loopback-mount the image. Prints the device if succesful
 cmd_loop_setup() {
+	test -r "$__image" || die "Image not readable [$__image]"
 	loop_setup$postfix
 }
 loop_setup() {
