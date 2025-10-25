@@ -46,10 +46,10 @@ findar() {
 cmd_env() {
 	test "$envread" = "yes" && return 0
 	envread=yes
-	eset ARCHIVE=$HOME/archive
-	eset FSEARCH_PATH=$HOME/Downloads:$ARCHIVE
 	versions
 	unset opts
+	eset ARCHIVE=$HOME/archive
+	eset FSEARCH_PATH=$HOME/Downloads:$ARCHIVE
 	eset \
 		BOOTLOADER_WORKSPACE=$TEMP/bootloader \
 		KERNELDIR=$HOME/tmp/linux \
@@ -68,9 +68,9 @@ cmd_env() {
 	fi
 	eset \
 		__kdir=$KERNELDIR/$ver_kernel \
-		__kcfg=$dir/config/$ver_kernel-$__arch \
+		__kcfg=$dir/config/$__arch/$ver_kernel \
 		__bbcfg=$dir/config/$ver_busybox \
-		__uboot_cfg=$dir/config/uboot-$__board-$__arch \
+		__uboot_cfg=$dir/config/$__arch/uboot-$__board \
 		__ubootobj=$WS/uboot-obj \
 		__type=gpt \
 		__size=64MiB \
@@ -168,6 +168,8 @@ cmd_setup_x86_64() {
 	$me busybox_build || die busybox_build
 	$me initrd_build initrd || die initrd_build
 	$me syslinux_build || die syslinux_build
+	$me image_build || die image_build
+	log "Test: ./admin.sh qemu --uefi"
 }
 cmd_setup_aarch64() {
 	$me kernel_build || die kernel_build
@@ -175,6 +177,7 @@ cmd_setup_aarch64() {
 	$me initrd_build initrd || die initrd_build
 	$me uboot_build || die uboot_build
 	$me uboot-image || die uboot-image
+	log "Test: ./admin.sh qemu"
 }
 #   kernel_unpack
 #     Unpack the kernel at $KERNELDIR
@@ -492,7 +495,7 @@ cmd_grub_build() {
 	make -j$(nproc) || die make
 	make DESTDIR=$PWD/sys install || die "make install"
 }
-##   qemu [--ktest]
+##   qemu [--ktest] [--uefi]
 ##     Start a qemu VM. --ktest start with -kernel/-initrd (no disk)
 cmd_qemu() {
 	rm -rf $tmp					# (since we 'exec')

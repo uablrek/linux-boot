@@ -4,7 +4,7 @@ Boot examples with Linux. A small Linux kernel with initrd is loaded
 in a Qemu VM with different disk partitions and bootloaders.
 
 [Development and contributions](#development-and-contributions) are
-described below below.
+described below.
 
 
 Most tasks can be done with the `admin.sh` script:
