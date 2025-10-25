@@ -317,6 +317,11 @@ and `extlinux` for MBR partitioned media.
 NOTE: The doc's say that `syslinux` can be used for partitioned media,
 but I can't get that to work.
 
+Dependencies:
+```
+sudo apt install nasm
+sudo apt install libgnutls28-dev
+```
 
 ## U-boot
 
