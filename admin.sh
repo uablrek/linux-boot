@@ -46,7 +46,10 @@ findar() {
 cmd_env() {
 	test "$envread" = "yes" && return 0
 	envread=yes
-	versions
+	eset \
+		ver_syslinux=syslinux-6.03 \
+		ver_uboot=u-boot-2025.07 \
+		ver_grub=grub-2.12
 	unset opts
 	eset ARCHIVE=$HOME/archive
 	eset FSEARCH_PATH=$HOME/Downloads:$ARCHIVE
@@ -56,6 +59,12 @@ cmd_env() {
 		kernel='' \
 		__arch=x86_64
 	eset WS=$BOOTLOADER_WORKSPACE/$__arch
+	# Kernel/BusyBox/initrd is delegated to qemu.sh
+	export ver_kernel=linux-6.17.8
+	eset qemu=$dir/qemu.sh
+	eval $($qemu versions --brief)
+	export WS
+	
 	eset __kobj=$WS/obj/$ver_kernel
 	if test "$__arch" = "aarch64"; then
 		kernel=$__kobj/arch/arm64/boot/Image
@@ -67,9 +76,6 @@ cmd_env() {
 			__board=sandbox
 	fi
 	eset \
-		__kdir=$KERNELDIR/$ver_kernel \
-		__kcfg=$dir/config/$__arch/$ver_kernel \
-		__bbcfg=$dir/config/$ver_busybox \
 		__uboot_cfg=$dir/config/$__arch/uboot-$__board \
 		__ubootobj=$WS/uboot-obj \
 		__type=gpt \
@@ -101,23 +107,13 @@ cmd_env() {
 }
 ##   versions [--brief]
 ##     Print used sw versions
-versions() {
-	eset \
-		ver_kernel=linux-6.15.4 \
-		ver_busybox=busybox-1.36.1 \
-		ver_syslinux=syslinux-6.03 \
-		ver_uboot=u-boot-2025.07 \
-		ver_grub=grub-2.12
-}
 cmd_versions() {
-	unset opts
-	versions
 	if test "$__brief" = "yes"; then
-	   set | grep -E "^($opts)="
-	   return 0
+		set | grep -E 'ver_[a-z0-9]+='
+		return 0
 	fi
 	local k v
-	for k in $(echo $opts | tr '|' ' '); do
+	for k in $(set | grep -E 'ver_[a-z0-9]+=' | cut -d= -f1); do
 		v=$(eval echo \$$k)
 		if findar $v; then
 			printf "%-20s (%s)\n" $v $f
@@ -164,72 +160,30 @@ cmd_setup() {
 	cmd_setup_$__arch
 }
 cmd_setup_x86_64() {
-	$me kernel_build || die kernel_build
-	$me busybox_build || die busybox_build
+	$qemu kernel_build || die kernel_build
+	$qemu busybox_build || die busybox_build
 	$me initrd_build initrd || die initrd_build
 	$me syslinux_build || die syslinux_build
 	$me image_build || die image_build
 	log "Test: ./admin.sh qemu --uefi"
 }
 cmd_setup_aarch64() {
-	$me kernel_build || die kernel_build
-	$me busybox_build || die busybox_build
+	$qemu kernel_build || die kernel_build
+	$qemu busybox_build || die busybox_build
 	$me initrd_build initrd || die initrd_build
 	$me uboot_build || die uboot_build
 	$me uboot-image || die uboot-image
 	log "Test: ./admin.sh qemu"
 }
-#   kernel_unpack
-#     Unpack the kernel at $KERNELDIR
-cmd_kernel_unpack() {
-	test -d $__kdir && return 0	  # (already unpacked)
-	log "Unpack kernel to [$__kdir]..."
-	findar $ver_kernel || die "Kernel source not found [$ver_kernel]"
-	mkdir -p $KERNELDIR
-	tar -C $KERNELDIR -xf $f
-}
-##   kernel_build --tinyconfig  # Init the kcfg
 ##   kernel_build [--menuconfig]
 ##     Build the kernel
 cmd_kernel_build() {
-	cmd_kernel_unpack
-	mkdir -p $__kobj
-	local make="make -C $__kdir O=$__kobj"
-	test "$__arch" = "aarch64" && \
-		make="$make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-"
-	if test "$__tinyconfig" = "yes"; then
-		rm -r $__kobj
-		mkdir -p $__kobj $(dirname $__kcfg)
-		$make -C $__kdir O=$__kobj tinyconfig
-		cp $__kobj/.config $__kcfg
-		__menuconfig=yes
-	fi
-
-	test -r $__kcfg || die "Not readable [$__kcfg]"
-	cp $__kcfg $__kobj/.config
-	if test "$__menuconfig" = "yes"; then
-		$make menuconfig
-		cp $__kobj/.config $__kcfg
-	else
-		$make oldconfig
-	fi
-	$make -j$(nproc)
+	$qemu kernel_build
 }
-##   busybox_build [--bbcfg=] [--menuconfig]
+##   busybox_build [--menuconfig]
 ##     Build BusyBox
 cmd_busybox_build() {
-	cdsrc $ver_busybox
-	if test "$__menuconfig" = "yes"; then
-		test -r $__bbcfg && cp $__bbcfg .config
-		make menuconfig
-		cp .config $__bbcfg
-	else
-		test -r $__bbcfg || die "No config"
-		cp $__bbcfg .config
-	fi
-	
-	sed -i -E "s,CONFIG_CROSS_COMPILER_PREFIX=\"\",CONFIG_CROSS_COMPILER_PREFIX=\"$__arch-linux-gnu-\"," .config
-	make -j$(nproc)
+	$qemu busybox_build
 }
 ##   initrd_build [--initrd=] [ovls...]
 ##     Build a ramdisk (cpio archive) with busybox and the passed
@@ -278,8 +232,9 @@ EOF
 cmd_gen_init_cpio() {
 	local x=$WS/bin/gen_init_cpio
 	test -x $x && return 0
-	cmd_kernel_unpack	
+	$qemu kernel-unpack
 	mkdir -p $(dirname $x)
+	eval $($qemu env | grep __kdir)
 	local src=$__kdir/usr/gen_init_cpio.c
 	test -r $src || die "Not readable [$src]"
 	gcc -o $x $src
@@ -495,45 +450,13 @@ cmd_grub_build() {
 	make -j$(nproc) || die make
 	make DESTDIR=$PWD/sys install || die "make install"
 }
-##   qemu [--ktest] [--uefi]
+##   qemu [--uefi]
 ##     Start a qemu VM. --ktest start with -kernel/-initrd (no disk)
 cmd_qemu() {
+	eval $($qemu env | grep __tap)
 	rm -rf $tmp					# (since we 'exec')
-	qemu_$__arch $@
-}
-qemu_x86_64() {
-	if test "$__ktest" = "yes"; then
-		test -r $kernel || die "Not readable [$kernel]"
-		test -r $__initrd || die "Not readable [$__initrd]"
-		exec qemu-system-x86_64 -enable-kvm -M q35 -m 128M -smp 4 \
-			-monitor none -serial stdio -kernel $kernel -initrd $__initrd $@
-	fi
-	test -r "$__image" || die "Not readable [$__image]"
-	local opt
-	if test "$__uefi" = "yes"; then
-		cp $OVMF_VARS $WS/OVMF_VARS
-		opt="-drive if=pflash,format=raw,readonly=on,file=$OVMF_CODE"
-		opt="$opt -drive if=pflash,format=raw,file=$WS/OVMF_VARS"
-		opt="$opt -net none"
-	fi
-	exec qemu-system-x86_64 -enable-kvm -M q35 -m 128M -smp 4 \
-		-monitor none -serial stdio $opt \
-		-drive file=$__image,index=0,media=disk,if=virtio,format=raw $@
-}
-qemu_aarch64() {
-	if test "$__ktest" = "yes"; then
-		test -r $kernel || die "Not readable [$kernel]"
-		test -r $__initrd || die "Not readable [$__initrd]"
-		exec qemu-system-aarch64 -nographic -cpu cortex-a72 \
-			-machine virt,virtualization=on,secure=off \
-			-monitor none -serial stdio -kernel $kernel -initrd $__initrd
-	fi
-	test -r "$__image" || die "Not readable [$__image]"
-	local bios=$__ubootobj/u-boot.bin
-	test -r $bios || die "Not readable [$bios]"
-	exec qemu-system-aarch64 -monitor none -serial stdio -nographic -smp 4 \
-		-machine virt,virtualization=on,secure=off -cpu cortex-a72 -bios $bios\
-		-drive file=$__image,index=0,media=disk,if=virtio,format=raw $@
+	$qemu run --hd --image=$__image --bios=$__ubootobj/u-boot.bin
+	# (qemu.sh will ignore --bios for arch=x86_64)
 }
 
 ##

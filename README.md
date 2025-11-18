@@ -2,6 +2,8 @@
 
 Boot examples with Linux. A small Linux kernel with initrd is loaded
 in a Qemu VM with different disk partitions and bootloaders.
+[QEMU.md](QEMU.md) describes for instance boot of linux distribution
+images (iso).
 
 [Development and contributions](#development-and-contributions) are
 described below.
